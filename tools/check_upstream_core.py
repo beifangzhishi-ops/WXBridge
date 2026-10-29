@@ -22,7 +22,10 @@ PIN = "6e603974bbac3bda93d88bbd6995510ae2547f5c"
 
 
 def load_upstream_db():
-    p = subprocess.run(["git", "-C", str(UPSTREAM), "rev-parse", "HEAD"],
+    # CCM checkouts may be owned by Windows Administrators. Scope Git trust
+    # to this exact pinned upstream path without changing global settings.
+    p = subprocess.run(["git", "-c", "safe.directory=" + str(UPSTREAM),
+                        "-C", str(UPSTREAM), "rev-parse", "HEAD"],
                        check=True, text=True, capture_output=True)
     if p.stdout.strip() != PIN:
         raise RuntimeError("Unsupported upstream commit")

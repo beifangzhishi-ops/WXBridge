@@ -25,12 +25,16 @@ Clone the private repository with an authenticated GitHub account:
 ```powershell
 gh repo clone OWNER/WXBridge "C:\path\to\WXBridge"
 cd "C:\path\to\WXBridge"
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[snapshot]"
+uv venv .venv --python 3.12
+$env:UV_CACHE_DIR = Join-Path (Get-Location) ".venv\uv-cache"
+uv pip install --python .\.venv\Scripts\python.exe cryptography zstandard
+$env:PYTHONPATH = Join-Path (Get-Location) "src"
 .\.venv\Scripts\python.exe -m wxbridge --help
 ```
 
-Replace OWNER with the GitHub username. That is a **source CLI** smoke test,
+Replace OWNER with the GitHub username. The `uv` CLI must be installed.
+This install intentionally avoids the optional UI/sending dependencies.
+That is a **source CLI** smoke test,
 not yet a test of chat reading or network API access. The upstream repository
 at the exact PIN described in REPLICA_SOURCE.md must also be provisioned for
 real DB reads. The Python HTTP API is implemented in `wxbridge.api`; see
