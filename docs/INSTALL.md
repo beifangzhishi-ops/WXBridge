@@ -40,7 +40,9 @@ at the exact PIN described in REPLICA_SOURCE.md must also be provisioned for
 real DB reads. The Python HTTP API is implemented in `wxbridge.api`; see
 `REMOTE_API.md` for token setup and Tailscale-only startup. It cannot read
 noha's chats until the local upstream core and noha-specific key vault work.
-The 6v EXE must be rebuilt to support `--node noha`.
+The 6v EXE must be rebuilt to support `--node noha` and `--node 6v`.
+Both computers run the identical read-only Python API service, with
+independent tokens and the same protocol; see `tools/run_api.ps1`.
 
 ## Privacy and publication
 

@@ -4,9 +4,11 @@
 
 [中文说明](docs/README.zh-CN.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Project rules](AGENTS.md)
 
-**Two-PC deployment (experimental):** 6v retains the sole EXE; noha runs a
-Python-only HTTP API over Tailscale. Login detection, noha key provisioning,
-and attachment streaming are not yet verified. See [HTTP API deployment](docs/REMOTE_API.md).
+**Two-PC deployment (experimental):** 6v and noha both run the **same**
+Python-only read API bound to their separate Tailscale IPs, each reading only
+local storage. 6v additionally retains the sole EXE command entrypoint;
+noha needs no EXE. Login detection, noha key provisioning, and remote
+attachment streaming are not yet verified. See [HTTP API deployment](docs/REMOTE_API.md).
 
 ## Current implementation
 

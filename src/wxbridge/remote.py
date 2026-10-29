@@ -8,6 +8,7 @@ import ipaddress
 from urllib import error, request
 from urllib.parse import urlsplit
 
+from .paths import STATE
 
 class RemoteError(ValueError):
     """A sanitized remote transport or protocol failure."""
@@ -16,11 +17,41 @@ class RemoteError(ValueError):
 API_VERSION = 1
 
 
-def query_remote(argv: list[str], *, url: str | None = None,
+def _private_config(node: str) -> tuple[str, str]:
+    """Read only explicitly provisioned Git-ignored node settings."""
+    endpoint = ""
+    secret = ""
+    config = STATE / "nodes.json"
+    peer_token = STATE / "peers" / (node + ".token")
+    try:
+        if config.is_file() and config.stat().st_size <= 4096:
+            data = json.loads(config.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                value = data.get(node)
+                if isinstance(value, str):
+                    endpoint = value
+    except (OSError, ValueError, TypeError):
+        pass
+    try:
+        if peer_token.is_file() and peer_token.stat().st_size <= 1024:
+            secret = peer_token.read_text(encoding="ascii").strip()
+    except (OSError, UnicodeError):
+        pass
+    return endpoint, secret
+
+
+def query_remote(argv: list[str], *, node: str = "noha",
+                 url: str | None = None,
                  token: str | None = None) -> tuple[int, object]:
-    """Forward one CLI data command; return the remote exit code and JSON."""
-    endpoint = (url or os.environ.get("WXBRIDGE_NOHA_URL") or "").rstrip("/")
-    secret = token or os.environ.get("WXBRIDGE_NOHA_TOKEN")
+    """Forward one CLI data command to either authenticated node."""
+    if node not in ("6v", "noha"):
+        raise RemoteError("unknown_remote_node")
+    prefix = "WXBRIDGE_" + node.upper()
+    saved_endpoint, saved_secret = _private_config(node)
+    endpoint = (url if url is not None else
+                os.environ.get(prefix + "_URL", saved_endpoint)).rstrip("/")
+    secret = (token if token is not None else
+              os.environ.get(prefix + "_TOKEN", saved_secret))
     if not endpoint.startswith("http://") or not secret:
         raise RemoteError("remote_api_not_configured")
     parsed = urlsplit(endpoint)

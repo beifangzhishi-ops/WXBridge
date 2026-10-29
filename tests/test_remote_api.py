@@ -27,6 +27,9 @@ class TestRemoteApi(unittest.TestCase):
         with self.assertRaisesRegex(RemoteError, "remote_endpoint_not_tailscale"):
             query_remote(["sessions"], url="http://example.com:18763",
                          token="synthetic-test-token")
+        with self.assertRaisesRegex(RemoteError, "unknown_remote_node"):
+            query_remote(["sessions"], node="untrusted", url="http://100.96.30.32:18763",
+                         token="synthetic-test-token")
 
     def test_uses_wire_protocol_without_proxy(self):
         payload = json.dumps({
@@ -63,6 +66,23 @@ class TestRemoteApi(unittest.TestCase):
         self.assertEqual(json.loads(opener.request.data)["args"],
                          ["sessions", "--limit", "1"])
         self.assertTrue(mock.called)
+
+    def test_second_node_uses_identical_transport(self):
+        with patch("wxbridge.remote.request.build_opener") as opener:
+            class FakeResponse:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *_):
+                    pass
+
+                def read(self, _):
+                    return b'{"protocol":1,"exitCode":0,"data":{"node":"6v"}}'
+            opener.return_value.open.return_value = FakeResponse()
+            code, result = query_remote(
+                ["self"], node="6v",
+                url="http://100.76.74.124:18763", token="synthetic-test-token")
+        self.assertEqual((code, result["node"]), (0, "6v"))
 
     def test_remote_node_never_opens_local_db_when_missing_token(self):
         with patch.dict("os.environ", {

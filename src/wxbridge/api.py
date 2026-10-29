@@ -12,7 +12,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 
@@ -84,6 +83,7 @@ def make_handler(secret: str):
                 return self.reply(404, {"error": "not_found"})
             return self.reply(200, {
                 "service": "WXBridge", "protocol": API_VERSION,
+                "node": os.environ.get("WXBRIDGE_NODE_ID", "unknown"),
                 "apiReady": True, "wechatLogin": "unknown",
                 "readerReady": "not_checked",
             })
@@ -126,9 +126,9 @@ def main(argv=None) -> int:
     if (address not in ipaddress.ip_network("100.64.0.0/10")
             or not 1 <= args.port <= 65535):
         parser.error("bind a valid Tailscale IPv4 address and TCP port")
-    secret = os.environ.get("WXBRIDGE_NOHA_TOKEN", "")
+    secret = os.environ.get("WXBRIDGE_API_TOKEN", "")
     if len(secret) < 24:
-        parser.error("WXBRIDGE_NOHA_TOKEN must contain at least 24 characters")
+        parser.error("WXBRIDGE_API_TOKEN must contain at least 24 characters")
     server = ThreadingHTTPServer((args.bind, args.port), make_handler(secret))
     try:
         print("WXBridge API listening on Tailscale port %d" % args.port,

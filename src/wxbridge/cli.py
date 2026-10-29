@@ -86,8 +86,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Local DB permission for source CLI; WXBridge.exe supplies it automatically",
     )
     parser.add_argument(
-        "--node", choices=("local", "noha"), default="local",
-        help="Read locally (default), or forward to the noha Tailscale API",
+        "--node", choices=("local", "6v", "noha"), default="local",
+        help="Read locally (default), or forward to the named Tailscale API node",
     )
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("providers", help="Inspect read-only backends without accessing chat data")
@@ -149,13 +149,14 @@ def main(argv=None) -> int:
     if args.command is None:
         parser.print_help()
         return 0
-    if args.node == "noha":
+    if args.node in ("6v", "noha"):
         # Do not forward local diagnostic commands or allow remote shell/GUI.
         if args.command in ("providers", "preflight") or args.backend != "cached-key":
             _json({"error": "unsupported_remote_command"})
             return 4
         try:
-            code, result = query_remote(raw_argv[raw_argv.index(args.command):])
+            code, result = query_remote(
+                raw_argv[raw_argv.index(args.command):], node=args.node)
         except RemoteError as exc:
             print(json.dumps({"error": str(exc)}), file=sys.stderr)
             return 4
