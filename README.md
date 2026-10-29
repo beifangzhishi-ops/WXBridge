@@ -57,8 +57,10 @@ account is ambiguous, the same account appears on both machines, or an API
 cannot be reached/identified, the EXE **fails instead of guessing**.
 
 **Login limitation:** the API's authenticated `/identity` endpoint checks for
-the WeChat process and the account attached to the local protected key vault.
-That is an *account candidate*, **not proof of an authenticated login**;
+the WeChat process, visible main-vs-login-window geometry and the account
+attached to the local protected key vault. This uses read-only Windows window
+metadata, never clicks or reads process memory. Hidden or ambiguous windows
+fail closed. This is an *account candidate*, **not proof of authenticated login**;
 responses explicitly carry `loginVerified:false`. No WeChat process memory,
 UI automation, key extraction, or state change is used. Successful message
 reads still depend on current locally available database and matching keys.

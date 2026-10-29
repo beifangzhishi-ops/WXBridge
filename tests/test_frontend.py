@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from wxbridge import frontend
-from wxbridge.identity import local_identity
+from wxbridge.identity import _window_evidence, local_identity
 from wxbridge.api import valid_query_args
 
 
@@ -80,11 +80,26 @@ class FrontendTests(unittest.TestCase):
 
     def test_local_identity_never_claims_verified_login(self):
         with patch("wxbridge.identity.wechat_process_state", return_value="present"):
-            with patch("wxbridge.identity.unseal_keys", return_value=("wxid_demo_abcd", "hash", {})):
-                result = local_identity()
+            with patch("wxbridge.identity.wechat_window_state", return_value="main_window"):
+                with patch("wxbridge.identity.unseal_keys", return_value=("wxid_demo_abcd", "hash", {})):
+                    result = local_identity()
         self.assertEqual(result["state"], "candidate")
         self.assertEqual(result["accountId"], "wxid_demo")
         self.assertFalse(result["loginVerified"])
+
+    def test_login_window_is_not_an_online_account(self):
+        with patch("wxbridge.identity.wechat_process_state", return_value="present"):
+            with patch("wxbridge.identity.wechat_window_state", return_value="login_window"):
+                with patch("wxbridge.identity.unseal_keys", return_value=("wxid_demo_abcd", "hash", {})):
+                    result = local_identity()
+        self.assertEqual(result["state"], "offline")
+        self.assertEqual(result["windowState"], "login_window")
+
+    def test_read_only_window_evidence_is_conservative(self):
+        self.assertEqual(_window_evidence(1, [(296, 388)]), "login_window")
+        self.assertEqual(_window_evidence(5, [(1339, 942)]), "main_window")
+        self.assertEqual(_window_evidence(1, []), "unknown")
+        self.assertEqual(_window_evidence(5, [(296, 388)]), "unknown")
 
 
 if __name__ == "__main__":

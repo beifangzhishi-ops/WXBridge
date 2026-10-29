@@ -29,8 +29,11 @@ plaintext databases or private chat data across machines.
 
 - Authenticated `GET /status`: compatibility status; no claim about login.
 - Authenticated `GET /identity`: `state=offline|candidate|unknown`,
-  `accountId`, `process`, and `loginVerified:false`. This is a best-effort
-  process-plus-local-vault signal, not proof of current login.
+  `accountId`, `process`, `windowState` and `loginVerified:false`. Uses
+  read-only WeChat window geometry to distinguish visible large main windows
+  from compact QR login dialogs in addition to the local account vault.
+  Hidden/ambiguous windows fail closed. This remains a heuristic, **not proof**
+  of the server-side login state.
 - Authenticated `POST /query`: JSON `{"args":["sessions","--limit","20"]}`;
   only allowlisted, bounded read commands are accepted and locally executed.
 

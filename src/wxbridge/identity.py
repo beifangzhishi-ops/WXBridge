@@ -14,10 +14,10 @@ import re
 from .keyvault import KeyVaultError, unseal_keys
 
 
-def wechat_process_state() -> str:
-    """Use Windows process metadata only; never inspect process memory/UI."""
+def _wechat_process_ids() -> set[int] | None:
+    """Find WeChat PIDs from the Windows process list, without memory reads."""
     if os.name != "nt":
-        return "unknown"
+        return None
     class ProcessEntry(ctypes.Structure):
         _fields_ = [
             ("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD),
@@ -37,23 +37,88 @@ def wechat_process_state() -> str:
     handle = kernel.CreateToolhelp32Snapshot(2, 0)
     invalid = ctypes.c_void_p(-1).value
     if not handle or handle == invalid:
-        return "unknown"
+        return None
     try:
         entry = ProcessEntry()
         entry.dwSize = ctypes.sizeof(entry)
         if not kernel.Process32FirstW(handle, ctypes.byref(entry)):
-            return "unknown"
+            return None
+        pids = set()
         while True:
             if entry.szExeFile.casefold() in ("weixin.exe", "wechat.exe"):
-                return "present"
+                pids.add(int(entry.th32ProcessID))
             if not kernel.Process32NextW(handle, ctypes.byref(entry)):
-                return "absent"
+                return pids
     finally:
         kernel.CloseHandle(handle)
 
 
+def wechat_process_state() -> str:
+    pids = _wechat_process_ids()
+    return "unknown" if pids is None else "present" if pids else "absent"
+
+
+def _window_evidence(process_count: int, sizes: list[tuple[int, int]]) -> str:
+    """Conservative WeChat 4.x window-size heuristic; never proof of login.
+
+    A visible large main window is distinguishable from a single compact QR
+    login dialog. Anything else is unknown, including tray-only operation.
+    """
+    if any(width >= 650 and height >= 480 for width, height in sizes):
+        return "main_window"
+    if (process_count == 1 and len(sizes) == 1
+            and 200 <= sizes[0][0] <= 480
+            and 250 <= sizes[0][1] <= 550):
+        return "login_window"
+    return "unknown"
+
+
+def wechat_window_state() -> str:
+    """Inspect only window class/geometry; no screenshot or UI automation."""
+    pids = _wechat_process_ids()
+    if pids is None:
+        return "unknown"
+    if not pids:
+        return "absent"
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+
+    class Rect(ctypes.Structure):
+        _fields_ = [("left", wintypes.LONG), ("top", wintypes.LONG),
+                    ("right", wintypes.LONG), ("bottom", wintypes.LONG)]
+
+    cb_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    user32.EnumWindows.argtypes = (cb_type, wintypes.LPARAM)
+    user32.EnumWindows.restype = wintypes.BOOL
+    user32.GetWindowThreadProcessId.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.DWORD))
+    user32.IsWindowVisible.argtypes = (wintypes.HWND,)
+    user32.GetClassNameW.argtypes = (wintypes.HWND, wintypes.LPWSTR, ctypes.c_int)
+    user32.GetWindowRect.argtypes = (wintypes.HWND, ctypes.POINTER(Rect))
+    sizes: list[tuple[int, int]] = []
+
+    @cb_type
+    def on_window(hwnd, _param):
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value not in pids or not user32.IsWindowVisible(hwnd):
+            return True
+        name = ctypes.create_unicode_buffer(256)
+        user32.GetClassNameW(hwnd, name, len(name))
+        # Only top-level WeChat windows, not unrelated utility windows.
+        if name.value != "WeChatMainWndForPC" and not name.value.endswith("QWindowIcon"):
+            return True
+        bounds = Rect()
+        if user32.GetWindowRect(hwnd, ctypes.byref(bounds)):
+            sizes.append((bounds.right - bounds.left, bounds.bottom - bounds.top))
+        return True
+
+    if not user32.EnumWindows(on_window, 0):
+        return "unknown"
+    return _window_evidence(len(pids), sizes)
+
+
 def local_identity() -> dict:
     process = wechat_process_state()
+    window = wechat_window_state() if process == "present" else "absent"
     account = None
     try:
         storage, _fingerprint, _keys = unseal_keys()
@@ -62,7 +127,8 @@ def local_identity() -> dict:
     except (KeyVaultError, OSError, ValueError):
         pass
     # Do not claim login from a process name and a potentially stale vault.
-    state = ("offline" if process == "absent" else
-             "candidate" if process == "present" and account else "unknown")
+    state = ("offline" if process == "absent" or window == "login_window" else
+             "candidate" if process == "present" and window == "main_window" and account
+             else "unknown")
     return {"state": state, "accountId": account,
-            "process": process, "loginVerified": False}
+            "process": process, "windowState": window, "loginVerified": False}
