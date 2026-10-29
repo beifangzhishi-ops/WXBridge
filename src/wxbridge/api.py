@@ -17,13 +17,14 @@ import sys
 
 from .remote import API_VERSION
 from .runtime import app_root
+from .identity import local_identity
 
 
 ALLOWED_COMMANDS = frozenset((
     "sessions", "messages", "search", "self", "contacts", "groups",
     "group-members", "labels", "message-chats", "new-messages",
     "message-storage", "media-status", "media-read",
-    "moments", "moment", "moment-interactions", "articles",
+    "moments", "moment", "moment-interactions", "articles", "file-list",
 ))
 MAX_BODY = 8 * 1024
 
@@ -41,7 +42,7 @@ def run_query(argv: list[str]) -> tuple[int, object]:
     env["PYTHONPATH"] = str(app_root() / "src")
     try:
         completed = subprocess.run(
-            [sys.executable, "-m", "wxbridge", "--allow-local-db", *argv],
+    [sys.executable, "-m", "wxbridge.local_ops", *argv],
             cwd=str(app_root()), env=env, capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=90,
         )
@@ -79,6 +80,9 @@ def make_handler(secret: str):
         def do_GET(self):
             if not self.authorized():
                 return self.reply(401, {"error": "unauthorized"})
+            if self.path == "/identity":
+                return self.reply(200, {"service": "WXBridge", "protocol": API_VERSION,
+                                        **local_identity()})
             if self.path != "/status":
                 return self.reply(404, {"error": "not_found"})
             return self.reply(200, {

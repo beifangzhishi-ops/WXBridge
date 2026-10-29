@@ -94,3 +94,48 @@ def query_remote(argv: list[str], *, node: str = "noha",
         if isinstance(exc, RemoteError):
             raise
         raise RemoteError("remote_invalid_response") from None
+
+
+def query_identity(node: str) -> dict:
+    """Read the authenticated, non-secret local account routing signal."""
+    if node not in ("6v", "noha"):
+        raise RemoteError("unknown_remote_node")
+    endpoint, secret = _private_config(node)
+    prefix = "WXBRIDGE_" + node.upper()
+    endpoint = os.environ.get(prefix + "_URL", endpoint).rstrip("/")
+    secret = os.environ.get(prefix + "_TOKEN", secret)
+    if not endpoint.startswith("http://") or not secret:
+        raise RemoteError("remote_api_not_configured")
+    parsed = urlsplit(endpoint)
+    try:
+        host = ipaddress.ip_address(parsed.hostname or "")
+        if (host not in ipaddress.ip_network("100.64.0.0/10")
+                or parsed.username or parsed.password or parsed.path
+                or parsed.query or parsed.fragment):
+            raise ValueError("wrong endpoint")
+    except ValueError:
+        raise RemoteError("remote_endpoint_not_tailscale") from None
+    req = request.Request(
+        endpoint + "/identity", method="GET",
+        headers={"X-WXBridge-Token": secret,
+                 "X-WXBridge-Protocol": str(API_VERSION)},
+    )
+    try:
+        with request.build_opener(request.ProxyHandler({})).open(req, timeout=8) as response:
+            raw = response.read(4097)
+    except error.HTTPError as exc:
+        raise RemoteError("remote_http_" + str(exc.code)) from None
+    except (error.URLError, TimeoutError, OSError):
+        raise RemoteError("remote_unreachable") from None
+    if len(raw) > 4096:
+        raise RemoteError("remote_invalid_response")
+    try:
+        result = json.loads(raw.decode("utf-8"))
+        if (result.get("protocol") != API_VERSION
+                or result.get("state") not in ("offline", "candidate", "unknown")
+                or result.get("loginVerified") is not False
+                or not isinstance(result.get("accountId"), (str, type(None)))):
+            raise ValueError("bad identity")
+        return result
+    except (ValueError, TypeError, UnicodeError):
+        raise RemoteError("remote_invalid_response") from None

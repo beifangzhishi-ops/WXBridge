@@ -129,6 +129,39 @@ def _decode_article(content):
 def read_extra(reader, action: str, args) -> dict:
     db = reader.db
     limit = getattr(args, "limit", 20)
+    if action == "file-list":
+        from .media_read import _file_metadata
+        files = []
+        scanned = 0
+        offset = getattr(args, "offset", 0)
+        # One cached reader/decrypted snapshot per operation; never scan all
+        # historical messages silently or launch a WeChat download.
+        while scanned < 1000 and len(files) < limit:
+            page = reader.messages(chat=args.chat, limit=100, offset=offset + scanned)
+            messages = page.get("messages", [])
+            for msg in messages:
+                scanned += 1
+                content = msg.get("content")
+                if not isinstance(content, str) or "<appmsg" not in content:
+                    continue
+                try:
+                    name, size, digest = _file_metadata(content)
+                except (CachedError, ValueError):
+                    continue
+                if args.keyword and args.keyword.casefold() not in name.casefold():
+                    continue
+                files.append({"messageId": msg.get("id"),
+                              "timestamp": msg.get("timestamp"),
+                              "name": name, "expectedSize": size,
+                              "expectedMd5": digest})
+                if len(files) >= limit:
+                    break
+            if len(messages) < 100:
+                break
+        return {"source": "wechat-local-db", "chat": args.chat,
+                "count": len(files), "files": files, "scanned": scanned,
+                "nextOffset": offset + scanned, "scanWindowLimit": 1000,
+                "completeHistory": False}
     if action == "message-storage":
         return _message_storage(db, args.chat)
     if action == "contacts":

@@ -1,22 +1,37 @@
 # WXBridge 使用说明
 
-WXBridge 是供 CCM、Codex 和本地用户调用的 Windows **只读微信数据库查询工具**。当前默认读取方式为 `cached-key`：缓存的是经过 Windows DPAPI 保护的数据库解密密钥，**不是聊天记录**。每次查询直接读取微信电脑端已保存的本地数据库；不保证能取得微信服务器上尚未同步的新消息。
+WXBridge 是严格只读的微信本地数据访问工具。仅在 6v 部署一个公开的
+`WXBridge.exe`，两台 Windows 机器分别运行同样的 Python HTTP API。
+noha 不需要 EXE。旧版 WXBridge CLI 已删除，**上游 CLI 未修改**。
 
-无参数运行只展示帮助，不检测密钥和消息是否可读。调用方应直接执行查询，成功时处理结果，失败时根据具体错误判断。不需要为了跨工作区读取微信，先进入 WXBridge 开发工作区；CCM 的连接错误也不等于沙箱授权请求。
-
-## 调用示例
+## 四个命令
 
 ```powershell
-& "C:\path\to\WXBridge\WXBridge.exe"
-& "C:\path\to\WXBridge\WXBridge.exe" sessions --limit 20
-& "C:\path\to\WXBridge\WXBridge.exe" contacts --keyword "示例"
-& "C:\path\to\WXBridge\WXBridge.exe" messages --chat "example_wxid" --limit 20
-& "C:\path\to\WXBridge\WXBridge.exe" articles --chat "gh_example" --limit 20
-& "C:\path\to\WXBridge\WXBridge.exe" media-read --chat "example_wxid" --message-id "message__message_3.db:602"
+WXBridge.exe                                  # 无参数显示帮助
+WXBridge.exe chats                            # 最近 20 个聊天
+WXBridge.exe chats --keyword "狂人"           # 查人或群
+WXBridge.exe messages --chat "狂人"           # 最近 30 条消息
+WXBridge.exe messages --chat "狂人" --keyword "论文"
+WXBridge.exe files --chat "狂人"              # 最近 20 个附件元数据
+WXBridge.exe files --chat "狂人" --id "message__message_3.db:602"
+WXBridge.exe moments                          # 最近 20 条朋友圈
+WXBridge.exe moments --interactions           # 朋友圈互动
+WXBridge.exe --account work chats             # 指定账号（可配置别名）
 ```
 
-EXE 必须与 `_wxbridge_runtime` 目录放在一起。另有 `snapshot` 模式，可读取用户事先准备的离线明文 SQLite 副本，但不会自动解密原始数据库。
+不会自动下载文件；`files --id` 返回已下载文件的本机路径，交给 CCM
+在返回的 `environment_id` 对应的电脑上读取。`chats`、`messages`、
+`files`、`moments` 的 `--limit` 都有默认值，并可用 `--offset` 继续查找。
 
-`media-read` 仅定位已下载的**文件附件**，在原目录内核对大小、MD5；不负责下载文件或解析 PDF。 `media-status` 只检查本地图片、语音缓存的可用性。 `articles` 只解析链接、标题、摘要等元数据，不抓取外部网页正文。
+## 账号和机器
 
-WXBridge 不提供发消息、修改联系人、点赞评论、微信界面自动化或自动下载能力；不会在常规读取时扫描微信进程内存来获取新密钥。更多技术细节见 [README](../README.md)、[安全说明](../SECURITY.md)、[EXE 构建](EXE_BUILD.md)。
+EXE 会联系两端 API 取得账号候选信息，自动选择目标环境，不提供
+`--node`、`--env` 或 `--environment` 参数。默认账号及别名可写在
+6v 的 `.state/accounts.json` 中，格式见根目录 README。
+
+重要限制：目前依据微信进程是否存在及本机 DPAPI 缓存所属账号推断
+“候选账号”，并**不能证明微信真正已登录**；输出会标记
+`loginVerified:false`。如账号冲突、状态未知或 API 不通，则直接报错。
+
+配置、部署与安全说明见 [REMOTE_API.md](REMOTE_API.md)、
+[EXE_BUILD.md](EXE_BUILD.md) 和根目录 [README.md](../README.md)。

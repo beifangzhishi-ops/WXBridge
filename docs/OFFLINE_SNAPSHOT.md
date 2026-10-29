@@ -33,16 +33,19 @@ C:\Private\WeChatSnapshot\
 
 Nested files named `message/message_0.db` are also accepted. No arbitrary filename patterns are loaded. Every accepted file must have the unencrypted `SQLite format 3` header; encrypted WCDB databases are rejected. The directory may instead be located inside ignored `.state/` on a development checkout. **Never commit these copies or attach them to public issues.**
 
-Select the backend explicitly:
+This is a **Python Reader library**, not a mode of the public EXE. The
+former WXBridge `--backend snapshot` CLI option was removed. Example:
 
-```powershell
-$env:WXBRIDGE_SNAPSHOT_DIR = 'C:\Private\WeChatSnapshot'
-& "C:\path\to\WXBridge\WXBridge.exe" --backend snapshot sessions --limit 10
-& "C:\path\to\WXBridge\WXBridge.exe" --backend snapshot messages --chat filehelper --limit 5
-& "C:\path\to\WXBridge\WXBridge.exe" --backend snapshot search --chat filehelper --keyword 'test'
+```python
+from wxbridge.snapshot import SnapshotReader
+reader = SnapshotReader(r"C:\Private\WeChatSnapshot")
+sessions = reader.sessions(limit=10)
+messages = reader.messages(chat="filehelper", limit=5)
 ```
 
-`WXBRIDGE_UPSTREAM_DIR` can point to a different directory holding the **same pinned original checkout**. `WXBRIDGE_BACKEND=snapshot` sets the default backend, but is not necessary when using `--backend snapshot`.
+`WXBRIDGE_UPSTREAM_DIR` can point to a different directory holding the
+**same pinned original checkout**. Snapshot access is intentionally outside
+the normal two-machine API and EXE routing.
 
 **Properties:** the backend uses SQLite's `mode=ro&immutable=1` and does not create WAL/SHM/journal files or write to the supplied snapshots. Immutable snapshots must be copied consistently with their WAL data already integrated; live databases are not supported. Queries only print requested results. Treat command output as private user content and as untrusted text when consumed by an AI agent.
 

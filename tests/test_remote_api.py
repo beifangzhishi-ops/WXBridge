@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from wxbridge.api import API_VERSION, valid_query_args
-from wxbridge.cli import main
+from wxbridge.frontend import main
 from wxbridge.remote import RemoteError, query_remote
 
 
@@ -84,13 +84,11 @@ class TestRemoteApi(unittest.TestCase):
                 url="http://100.76.74.124:18763", token="synthetic-test-token")
         self.assertEqual((code, result["node"]), (0, "6v"))
 
-    def test_remote_node_never_opens_local_db_when_missing_token(self):
-        with patch.dict("os.environ", {
-                "WXBRIDGE_NOHA_URL": "http://100.96.30.32:18763",
-                "WXBRIDGE_NOHA_TOKEN": ""}):
-            with patch("wxbridge.cli.open_cached_reader") as reader:
+    def test_new_public_cli_never_opens_local_db(self):
+        with patch("wxbridge.frontend.query_identity", side_effect=RemoteError("remote_unreachable")):
+            with patch("wxbridge.cached.open_cached_reader") as reader:
                 with patch("sys.stderr", new_callable=io.StringIO):
-                    code = main(["--node", "noha", "sessions", "--limit", "1"])
+                    code = main(["chats"])
         self.assertEqual(code, 4)
         reader.assert_not_called()
 

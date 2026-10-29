@@ -21,7 +21,7 @@ classifiers = [
 ]
 
 [project.scripts]
-wxbridge = "wxbridge.cli:main"
+wxbridge = "wxbridge.frontend:main"
 
 [project.optional-dependencies]
 # Only needed when using an already-decrypted offline SQLite snapshot.

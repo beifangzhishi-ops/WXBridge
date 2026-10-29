@@ -91,13 +91,11 @@ without retrieving any of their message-body values.
 
 ```powershell
 & "C:\path\to\WXBridge\WXBridge.exe"
-& "C:\path\to\WXBridge\WXBridge.exe" sessions --limit 20
+& "C:\path\to\WXBridge\WXBridge.exe" chats --limit 20
 ```
 
-With no arguments the program prints help and exits 0. All EXE commands
-default to `--backend cached-key --allow-local-db`; the DPAPI key vault is
-looked up under the checkout's ignored `.state/` when the EXE lives in the
-checkout. Running with no arguments only displays help. Read queries
-may create temporary decrypted SQLite copies in the invoking workspace's
-current directory and remove them afterward. Full live database compatibility
-must be separately verified for each operation.
+With no arguments the EXE prints help and exits 0. The EXE does not open local
+databases: it selects the account and contacts one of the two authenticated
+API services. Each API starts an internal cached-key Reader subprocess;
+temporary decrypted SQLite copies belong to the API host and are removed
+after each query. Snapshot queries are available through the library only.

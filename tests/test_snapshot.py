@@ -125,25 +125,15 @@ class UpstreamSnapshotTests(unittest.TestCase):
         self.assertEqual([m["content"] for m in result["messages"]],
                          ["synthetic second"])
 
-    def test_cli_in_separate_python_process(self):
+    def test_public_cli_does_not_accept_legacy_snapshot_flag(self):
         env = os.environ.copy()
         env["PYTHONPATH"] = str(ROOT / "src")
-        env["WXBRIDGE_SNAPSHOT_DIR"] = str(self.path)
-        env["WXBRIDGE_BACKEND"] = "snapshot"
         proc = subprocess.run(
-            [sys.executable, "-m", "wxbridge", "messages", "--chat", "filehelper", "--limit", "2"],
+            [sys.executable, "-m", "wxbridge", "--backend", "snapshot", "chats"],
             env=env, capture_output=True, timeout=20)
-        # The Windows worker may emit localized CP936 diagnostics on stderr.
-        # Preserve UTF-8 JSON stdout while decoding unexpected errors safely.
-        output = proc.stdout.decode("utf-8", errors="replace")
-        diagnostics = proc.stderr.decode("utf-8", errors="replace")
-        self.assertEqual(proc.returncode, 0, diagnostics)
-        self.assertIn("synthetic second", output)
-        self.assertNotIn("Traceback", diagnostics)
+        self.assertNotEqual(proc.returncode, 0)
 
-    @unittest.skipUnless((ROOT / "WXBridge.exe").is_file()
-                         and (ROOT / "_wxbridge_runtime").is_dir(),
-                         "requires optional locally built Windows EXE")
+    @unittest.skip("Offline snapshot is a Reader API, not an EXE command")
     def test_frozen_exe_reads_only_fabricated_snapshot(self):
         """Verify embedded upstream code, DLLs and adapter via synthetic SQL."""
         env = os.environ.copy()
@@ -160,9 +150,7 @@ class UpstreamSnapshotTests(unittest.TestCase):
         self.assertIn('"source":"offline_snapshot"', out)
         self.assertNotIn("Traceback", err)
 
-    @unittest.skipUnless((ROOT / "WXBridge.exe").is_file()
-                         and (ROOT / "_wxbridge_runtime").is_dir(),
-                         "requires optional locally built Windows EXE")
+    @unittest.skip("Offline snapshot is a Reader API, not an EXE command")
     def test_frozen_exe_reads_synthetic_official_biz_message(self):
         env = os.environ.copy()
         env["WXBRIDGE_SNAPSHOT_DIR"] = str(self.path)

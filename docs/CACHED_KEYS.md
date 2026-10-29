@@ -15,7 +15,7 @@ This describes the **internal** Windows DPAPI key vault for maintenance. Ordinar
 
 ```powershell
 & "C:\path\to\WXBridge\WXBridge.exe"
-& "C:\path\to\WXBridge\WXBridge.exe" sessions --limit 20
+& "C:\path\to\WXBridge\WXBridge.exe" chats --limit 20
 & "C:\path\to\WXBridge\WXBridge.exe" messages --chat filehelper --limit 5
 ```
 

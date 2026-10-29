@@ -65,9 +65,9 @@ class ReadOnlyGateTests(unittest.TestCase):
     def test_readonly_commands_still_visible(self):
         result = self._run("wxbridge", "--help")
         self.assertEqual(result.returncode, 0)
-        for name in ("sessions", "messages", "search", "contacts",
-            "groups", "media-read", "moments", "articles"):
+        for name in ("chats", "messages", "files", "moments"):
             self.assertIn("    " + name + " ", result.stdout)
+        self.assertNotIn("--node", result.stdout)
 
 
 if __name__ == "__main__":

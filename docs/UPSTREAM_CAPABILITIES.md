@@ -5,7 +5,7 @@ WXBridge wraps only read-oriented methods from hash-verified source. The
 underlying upstream package contains both read and write operations, but
 **WXBridge deliberately does not expose those upstream write operations**.
 
-| Original upstream | WXBridge `cached-key` CLI | Limits |
+| Original upstream | WXBridge internal read API (`local_ops`) | Limits |
 | --- | --- | --- |
 | `WeChatDB.get_sessions/get_messages` | `sessions/messages/search` | Real message read via CCM verified |
 | `search_contact` | `contacts --keyword` | Bounded search |

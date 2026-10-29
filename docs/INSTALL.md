@@ -14,9 +14,9 @@ the pinned upstream source and isolated build environment; see EXE_BUILD.md.
 & "C:\path\to\WXBridge\WXBridge.exe" --help
 ```
 
-For actual reads, the CLI additionally requires locally available
-WeChat database files and a separately provisioned Windows-user DPAPI key
-cache. Keys are never distributed through GitHub.
+For actual reads, the chosen API host needs locally available WeChat
+database files and its own Windows-user DPAPI key cache. Keys are not
+distributed through GitHub.
 
 ## noha: Python source and API host (not a second EXE)
 
@@ -34,13 +34,13 @@ $env:PYTHONPATH = Join-Path (Get-Location) "src"
 
 Replace OWNER with the GitHub username. The `uv` CLI must be installed.
 This install intentionally avoids the optional UI/sending dependencies.
-That is a **source CLI** smoke test,
+That is a **source frontend help** smoke test,
 not yet a test of chat reading or network API access. The upstream repository
 at the exact PIN described in REPLICA_SOURCE.md must also be provisioned for
 real DB reads. The Python HTTP API is implemented in `wxbridge.api`; see
 `REMOTE_API.md` for token setup and Tailscale-only startup. It cannot read
 noha's chats until the local upstream core and noha-specific key vault work.
-The 6v EXE must be rebuilt to support `--node noha` and `--node 6v`.
+The 6v EXE must be rebuilt to route automatically via both API identities.
 Both computers run the identical read-only Python API service, with
 independent tokens and the same protocol; see `tools/run_api.ps1`.
 
