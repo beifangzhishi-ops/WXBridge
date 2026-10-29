@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a WXBridge bug without sharing private chat data or secrets
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Never upload WeChat credentials, database keys, private chats, or personal message exports. Use fabricated data when possible."
+  - type: input
+    id: python
+    attributes:
+      label: Python and Windows versions
+      placeholder: "Python 3.13, Windows 11"
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Data provider and exact version
+      placeholder: "WXBridge version / WeChat version (optional)"
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps (no personal data)
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

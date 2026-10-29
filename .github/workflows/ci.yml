@@ -1,0 +1,52 @@
+name: Test WXBridge
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install editable package
+        run: python -m pip install -e .
+      - name: Prepare pinned upstream for Windows-only snapshot tests
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force .vendor | Out-Null
+          git clone https://github.com/fanyuantaier/wechatauto-replica.git .vendor/replica-src
+          git -C .vendor/replica-src checkout --detach 6e603974bbac3bda93d88bbd6995510ae2547f5c
+          python -m pip install ".[snapshot]"
+      - name: Unit tests (fabricated data only)
+        run: python -m unittest discover -s tests -v
+      - name: CLI smoke checks
+        run: |
+          wxbridge --help
+          wxbridge --version
+          wxbridge status
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build source and wheel archives
+        run: |
+          python -m pip install build
+          python -m build
