@@ -51,9 +51,14 @@ def _load_upstream():
         if not embedded_source_is_verified(src):
             raise SnapshotError("embedded_upstream_db_hash_mismatch")
     else:
+        # A CCM-managed Windows checkout can be owned by Administrators
+        # even when the worker runs as the user. Trust only this one exact
+        # Git directory for metadata queries; the pinned HEAD and content
+        # checks below remain mandatory.
+        git = ["git", "-c", "safe.directory=" + str(checkout), "-C", str(checkout)]
         try:
             proc = subprocess.run(
-                ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+                [*git, "rev-parse", "HEAD"],
                 capture_output=True, text=True, check=False, timeout=5,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -64,7 +69,7 @@ def _load_upstream():
         # could load arbitrary code. Require the exact committed file.
         try:
             expected = subprocess.run(
-                ["git", "-C", str(checkout), "rev-parse", "HEAD:wechatauto/db.py"],
+                [*git, "rev-parse", "HEAD:wechatauto/db.py"],
                 capture_output=True, text=True, check=False, timeout=5,
             )
             actual = subprocess.run(
