@@ -22,6 +22,7 @@ WXBridge.exe --account work chats             # 指定账号（可配置别名�
 不会自动下载文件；`files --id` 返回已下载文件的本机路径，交给 CCM
 在返回的 `environment_id` 对应的电脑上读取。`chats`、`messages`、
 `files`、`moments` 的 `--limit` 都有默认值，并可用 `--offset` 继续查找。
+按昵称查找优先精确匹配；只有模糊搜索结果唯一时才自动解析，重名或多结果会报错。
 
 ## 账号和机器
 

@@ -151,7 +151,8 @@ def _resolve_chat(node: str, chat: str) -> str:
         return chat
     sessions = _query(node, "sessions", "--keyword", chat, "--limit", "100").get("sessions", [])
     contacts = _query(node, "contacts", "--keyword", chat, "--limit", "100").get("contacts", [])
-    found = {}
+    exact = {}
+    fuzzy = {}
     for item in [*sessions, *contacts]:
         if not isinstance(item, dict):
             continue
@@ -160,7 +161,26 @@ def _resolve_chat(node: str, chat: str) -> str:
             continue
         names = [str(item.get(key) or "") for key in ("name", "nick_name", "remark", "nickname")]
         if chat == ident or chat in names:
-            found[ident] = item
+            exact[ident] = item
+        elif any(chat.casefold() in name.casefold() for name in names if name):
+            fuzzy[ident] = item
+    # Preserve exact-name priority; a unique nickname substring is safe to
+    # resolve, but never silently pick one of multiple matching contacts.
+    found = exact if exact else fuzzy
+    if not found:
+        groups = _query(node, "groups", "--limit", "100").get("groups", [])
+        for item in groups:
+            if not isinstance(item, dict):
+                continue
+            ident = item.get("id") or item.get("username")
+            if not isinstance(ident, str) or not ident:
+                continue
+            name = str(item.get("name") or "")
+            if chat == ident or chat == name:
+                exact[ident] = item
+            elif name and chat.casefold() in name.casefold():
+                fuzzy[ident] = item
+        found = exact if exact else fuzzy
     if len(found) == 1:
         return next(iter(found))
     if len(found) > 1:

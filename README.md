@@ -35,6 +35,8 @@ messages or automate the WeChat UI. Private development project.
 Commands: `chats`, `messages`, `files`, `moments`. Use `--help` on each for
 filters and pagination. No machine selection option. Output is JSON with
 `environment_id` (`DESKTOP-KFL6V1F` or `noha`) and `account_id`.
+Conversation lookup prefers exact names and IDs, then permits a unique
+partial-name match. Ambiguous names return an error instead of guessing.
 
 File listing returns message IDs and attachment metadata; selecting an ID
 returns a locally verified path for an **already-downloaded** file, which CCM

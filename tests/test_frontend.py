@@ -74,6 +74,33 @@ class FrontendTests(unittest.TestCase):
         query.assert_called_once_with("noha", "media-read", "--chat", "wxid_person",
                                       "--message-id", "message__message_3.db:602")
 
+    def test_unique_partial_nickname_resolves_for_messages(self):
+        def api(_node, command, *_args):
+            if command == "sessions":
+                return {"sessions": []}
+            if command == "contacts":
+                return {"contacts": [{"username": "wxid_fictional", "nick_name": "狂人朋友"}]}
+            raise AssertionError(command)
+        with patch.object(frontend, "_query", side_effect=api):
+            self.assertEqual(frontend._resolve_chat("noha", "狂人"), "wxid_fictional")
+
+    def test_ambiguous_partial_nicknames_are_not_guessed(self):
+        def api(_node, command, *_args):
+            return ({"sessions": []} if command == "sessions" else
+                    {"contacts": [{"username": "wxid_a", "nick_name": "狂人一"},
+                                  {"username": "wxid_b", "nick_name": "狂人二"}]})
+        with patch.object(frontend, "_query", side_effect=api):
+            with self.assertRaisesRegex(frontend.FrontendError, "ambiguous_chat"):
+                frontend._resolve_chat("noha", "狂人")
+
+    def test_group_name_resolves_when_no_contact_matches(self):
+        def api(_node, command, *_args):
+            return {"sessions": []} if command == "sessions" else (
+                {"contacts": []} if command == "contacts" else
+                {"groups": [{"username": "fictional@chatroom", "name": "测试交流群"}]})
+        with patch.object(frontend, "_query", side_effect=api):
+            self.assertEqual(frontend._resolve_chat("noha", "交流群"), "fictional@chatroom")
+
     def test_api_only_exposes_bounded_read_operations(self):
         self.assertTrue(valid_query_args(["file-list", "--chat", "wxid_person"]))
         self.assertFalse(valid_query_args(["send", "hello"]))
