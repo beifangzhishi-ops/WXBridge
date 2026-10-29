@@ -53,3 +53,5 @@ Version-sync both source checkouts, rebuild 6v EXE, and restart **both**
 APIs after code updates. Git synchronization alone does not restart an API.
 Both nodes need local Python dependencies and their own authorized DPAPI vault.
 No persistent Windows service/scheduled-task installation is bundled.
+Windows API startup now requests exclusive port ownership, so an old service
+must be stopped before a replacement can bind to the same IP and port.

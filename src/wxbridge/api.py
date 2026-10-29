@@ -1,7 +1,7 @@
 """Read-only Tailscale HTTP API for a Windows WXBridge Python installation.
 
-No upstream code is copied or modified. The server runs each approved CLI
-request in a local Python subprocess, reusing cached-only database semantics.
+The API starts a one-shot local Reader worker. Only the public EXE routes
+between machines, and upstream's CLI is never invoked.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
 import json
 import os
+import socket
 import subprocess
 import sys
 
@@ -37,12 +38,12 @@ def valid_query_args(value: object) -> bool:
 
 
 def run_query(argv: list[str]) -> tuple[int, object]:
-    """Run the same cached-key CLI on the machine holding the local DB."""
+    """Run the local-only cached-key Reader on the machine holding the DB."""
     env = os.environ.copy()
     env["PYTHONPATH"] = str(app_root() / "src")
     try:
         completed = subprocess.run(
-    [sys.executable, "-m", "wxbridge.local_ops", *argv],
+            [sys.executable, "-m", "wxbridge.local_ops", *argv],
             cwd=str(app_root()), env=env, capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=90,
         )
@@ -121,6 +122,21 @@ def make_handler(secret: str):
     return Handler
 
 
+class ExclusiveHTTPServer(ThreadingHTTPServer):
+    """Prevent a new API from sharing a port with a stale Windows process.
+
+    Windows SO_REUSEADDR permits competing listeners, unlike Linux semantics.
+    Fail startup instead of letting queries silently hit an older API.
+    """
+
+    allow_reuse_address = False
+
+    def server_bind(self):
+        if os.name == "nt":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="WXBridge Tailscale-only API")
     parser.add_argument("--bind", required=True, help="Tailscale IPv4 address")
@@ -133,7 +149,7 @@ def main(argv=None) -> int:
     secret = os.environ.get("WXBRIDGE_API_TOKEN", "")
     if len(secret) < 24:
         parser.error("WXBRIDGE_API_TOKEN must contain at least 24 characters")
-    server = ThreadingHTTPServer((args.bind, args.port), make_handler(secret))
+    server = ExclusiveHTTPServer((args.bind, args.port), make_handler(secret))
     try:
         print("WXBridge API listening on Tailscale port %d" % args.port,
               flush=True)

@@ -1,16 +1,26 @@
 """Synthetic protocol tests; no sockets, chat data, or real key cache."""
 
 import io
+import socket
 import json
 import unittest
 from unittest.mock import patch
 
-from wxbridge.api import API_VERSION, valid_query_args
+from wxbridge.api import API_VERSION, ExclusiveHTTPServer, make_handler, valid_query_args
 from wxbridge.frontend import main
 from wxbridge.remote import RemoteError, query_remote
 
 
 class TestRemoteApi(unittest.TestCase):
+    @unittest.skipUnless(__import__("os").name == "nt", "Windows socket binding semantics")
+    def test_api_listener_does_not_share_port_with_other_servers(self):
+        with ExclusiveHTTPServer(("127.0.0.1", 0), make_handler("fictional-test-token")) as server:
+            port = server.server_address[1]
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                with self.assertRaises(OSError):
+                    sock.bind(("127.0.0.1", port))
+
     def test_only_read_commands(self):
         self.assertTrue(valid_query_args(["sessions", "--limit", "2"]))
         self.assertTrue(valid_query_args(["media-read", "--chat", "fiction"]))
