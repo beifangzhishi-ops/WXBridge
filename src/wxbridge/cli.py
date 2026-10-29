@@ -19,6 +19,7 @@ from .cached import CachedError, open_cached_reader
 from .keyvault import KeyVaultError
 from .extras import read_extra
 from .runtime import app_root, frozen
+from .remote import RemoteError, query_remote
 
 EXTRA_COMMANDS = (
     "self", "contacts", "groups", "group-members", "labels",
@@ -84,6 +85,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-local-db", action="store_true",
         help="Local DB permission for source CLI; WXBridge.exe supplies it automatically",
     )
+    parser.add_argument(
+        "--node", choices=("local", "noha"), default="local",
+        help="Read locally (default), or forward to the noha Tailscale API",
+    )
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("providers", help="Inspect read-only backends without accessing chat data")
     commands.add_parser("preflight", help="Inspect local WeChat file metadata only (no keys/messages)")
@@ -139,10 +144,26 @@ def _json(value: object) -> None:
 
 def main(argv=None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    args = parser.parse_args(raw_argv)
     if args.command is None:
         parser.print_help()
         return 0
+    if args.node == "noha":
+        # Do not forward local diagnostic commands or allow remote shell/GUI.
+        if args.command in ("providers", "preflight") or args.backend != "cached-key":
+            _json({"error": "unsupported_remote_command"})
+            return 4
+        try:
+            code, result = query_remote(raw_argv[raw_argv.index(args.command):])
+        except RemoteError as exc:
+            print(json.dumps({"error": str(exc)}), file=sys.stderr)
+            return 4
+        if code == 0:
+            _json(result)
+        else:
+            print(json.dumps(result), file=sys.stderr)
+        return code
     try:
         if args.backend not in ("snapshot", "cached-key"):
             raise ValueError("Invalid backend selection")

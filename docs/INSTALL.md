@@ -33,8 +33,10 @@ py -3.12 -m venv .venv
 Replace OWNER with the GitHub username. That is a **source CLI** smoke test,
 not yet a test of chat reading or network API access. The upstream repository
 at the exact PIN described in REPLICA_SOURCE.md must also be provisioned for
-real DB reads. The HTTP API service is a separate integration; this original
-source version does not contain a functioning HTTP listener.
+real DB reads. The Python HTTP API is implemented in `wxbridge.api`; see
+`REMOTE_API.md` for token setup and Tailscale-only startup. It cannot read
+noha's chats until the local upstream core and noha-specific key vault work.
+The 6v EXE must be rebuilt to support `--node noha`.
 
 ## Privacy and publication
 

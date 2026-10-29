@@ -4,6 +4,10 @@
 
 [中文说明](docs/README.zh-CN.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Project rules](AGENTS.md)
 
+**Two-PC deployment (experimental):** 6v retains the sole EXE; noha runs a
+Python-only HTTP API over Tailscale. Login detection, noha key provisioning,
+and attachment streaming are not yet verified. See [HTTP API deployment](docs/REMOTE_API.md).
+
 ## Current implementation
 
 - The **default `cached-key` backend** directly reads locally stored WeChat databases using previously provisioned, Windows DPAPI-protected decryption keys. The keys, not the messages, are cached. Each query may create temporary decrypted SQLite copies in the *invoking workspace*; they are deleted on exit.
