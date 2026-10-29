@@ -12,6 +12,8 @@ from contextlib import contextmanager, redirect_stdout, redirect_stderr
 import io
 import os
 from pathlib import Path
+import secrets
+import shutil
 import tempfile
 from types import MethodType
 
@@ -24,6 +26,35 @@ from .message_shards import message_shards
 
 class CachedError(ValueError):
     """Safe, non-secret failure code."""
+
+
+@contextmanager
+def _temporary_reader_dir():
+    """Unique per-query scratch directory, removed even on read failure.
+
+    Windows Python 3.12's tempfile mode=0o700 can make new directories
+    inaccessible to a restricted CCM user token. Use an atomic random mkdir
+    that inherits the private workspace ACL instead; never broaden the ACL.
+    Non-Windows hosts retain tempfile's restrictive default permissions.
+    """
+    parent = Path.cwd()
+    if os.name != "nt":
+        with tempfile.TemporaryDirectory(prefix="wxbridge-cached-", dir=str(parent)) as temp:
+            yield temp
+        return
+    for _ in range(10):
+        path = parent / ("wxbridge-cached-" + secrets.token_hex(12))
+        try:
+            path.mkdir()
+            break
+        except FileExistsError:
+            continue
+    else:
+        raise CachedError("temporary_directory_unavailable")
+    try:
+        yield str(path)
+    finally:
+        shutil.rmtree(path)
 
 
 def _blocked(*_args, **_kwargs):
@@ -78,7 +109,7 @@ def open_cached_reader():
     # different registered project has host-wide read access to the DPAPI
     # vault, but must not need write access inside the WXBridge source tree.
     # The entire directory disappears when the one-shot query completes.
-    with tempfile.TemporaryDirectory(prefix="wxbridge-cached-", dir=str(Path.cwd())) as temp:
+    with _temporary_reader_dir() as temp:
         try:
             with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 db = _prepare(upstream, temp)

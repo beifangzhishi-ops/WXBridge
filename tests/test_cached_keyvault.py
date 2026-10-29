@@ -135,18 +135,25 @@ class CacheBackendTests(unittest.TestCase):
         """No real Windows scratch directory/ACL mutation in this test."""
         expected_dir = Path.cwd()
         @contextmanager
-        def simulated_temp(*args, **kwargs):
-            self.assertEqual(Path(kwargs["dir"]), expected_dir)
+        def simulated_temp():
             yield str(expected_dir / "fictional-temporary-database-directory")
 
         with patch.object(cached, "_load_upstream", return_value=object()):
             with patch.object(cached, "_prepare", side_effect=lambda _u, path: (
                     SimpleNamespace(get_sessions=lambda limit: [],
                                     workdir=path))):
-                with patch.object(cached.tempfile, "TemporaryDirectory",
+                with patch.object(cached, "_temporary_reader_dir",
                                   side_effect=simulated_temp):
                     with cached.open_cached_reader() as reader:
                         self.assertEqual(Path(reader.db.workdir).parent, expected_dir)
+
+    def test_ephemeral_workspace_directory_is_writable_and_cleaned(self):
+        with cached._temporary_reader_dir() as location:
+            directory = Path(location)
+            self.assertEqual(directory.parent, Path.cwd())
+            self.assertTrue(directory.is_dir())
+            (directory / "fictional-test-only.txt").write_text("fictional")
+        self.assertFalse(directory.exists())
 
 
 if __name__ == "__main__":
