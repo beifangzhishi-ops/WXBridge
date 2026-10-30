@@ -27,7 +27,7 @@ class FrontendTests(unittest.TestCase):
         self.assertIn("chats,messages,files,moments", out.getvalue())
 
     def test_single_account_autoroutes_to_same_api_even_for_6v(self):
-        identities = self._identities(self._identity("candidate", "wxid_one"),
+        identities = self._identities(self._identity("online", "wxid_one"),
                                      self._identity("offline"))
         with patch.object(frontend, "_config", return_value={}):
             with patch.object(frontend, "query_identity", side_effect=lambda node: identities[node]):
@@ -40,32 +40,44 @@ class FrontendTests(unittest.TestCase):
 
     def test_named_account_routes_to_noha(self):
         identities = self._identities(self._identity("offline"),
-                                     self._identity("candidate", "wxid_two"))
+                                     self._identity("online", "wxid_two"))
         cfg = {"default": "primary", "aliases": {"primary": "wxid_two"}}
         with patch.object(frontend, "_config", return_value=cfg):
             with patch.object(frontend, "query_identity", side_effect=lambda node: identities[node]):
                 self.assertEqual(frontend.select_node(None), ("noha", "wxid_two"))
 
     def test_fails_closed_on_same_account_both_machines(self):
-        identity = self._identity("candidate", "wxid_same")
+        identity = self._identity("online", "wxid_same")
         with patch.object(frontend, "_config", return_value={}):
             with patch.object(frontend, "query_identity", return_value=identity):
                 with self.assertRaisesRegex(frontend.FrontendError, "multiple_environments"):
                     frontend.select_node(None)
 
-    def test_fails_closed_on_unknown_or_unreachable(self):
+    def test_offline_or_unreachable_peer_does_not_block_online_account(self):
         with patch.object(frontend, "_config", return_value={}):
-            for second in (self._identity("unknown"), None):
+            for second in (self._identity("offline", "wxid_one"), None):
                 with self.subTest(second=second):
                     def identity(node):
                         if node == "6v":
-                            return self._identity("candidate", "wxid_one")
+                            return self._identity("online", "wxid_one")
                         if second is None:
                             raise frontend.RemoteError("remote_unreachable")
                         return second
                     with patch.object(frontend, "query_identity", side_effect=identity):
-                        with self.assertRaises(frontend.FrontendError):
-                            frontend.select_node(None)
+                        self.assertEqual(frontend.select_node(None), ("6v", "wxid_one"))
+
+    def test_unreachable_node_does_not_count_as_confirmed_online(self):
+        with patch.object(frontend, "_config", return_value={}):
+            with patch.object(frontend, "query_identity",
+                              side_effect=frontend.RemoteError("remote_unreachable")):
+                with self.assertRaisesRegex(frontend.FrontendError, "environment_status_unavailable"):
+                    frontend.select_node(None)
+
+    def test_two_offline_nodes_have_no_selected_account(self):
+        with patch.object(frontend, "_config", return_value={}):
+            with patch.object(frontend, "query_identity", return_value=self._identity("offline", "wxid_same")):
+                with self.assertRaisesRegex(frontend.FrontendError, "account_not_found"):
+                    frontend.select_node(None)
 
     def test_public_operations_forward_existing_api_commands(self):
         ns = frontend.parser().parse_args(["files", "--chat", "wxid_person", "--id", "message__message_3.db:602"])
@@ -110,7 +122,7 @@ class FrontendTests(unittest.TestCase):
             with patch("wxbridge.identity.wechat_window_state", return_value="main_window"):
                 with patch("wxbridge.identity.unseal_keys", return_value=("wxid_demo_abcd", "hash", {})):
                     result = local_identity()
-        self.assertEqual(result["state"], "candidate")
+        self.assertEqual(result["state"], "online")
         self.assertEqual(result["accountId"], "wxid_demo")
         self.assertFalse(result["loginVerified"])
 
@@ -125,8 +137,17 @@ class FrontendTests(unittest.TestCase):
     def test_read_only_window_evidence_is_conservative(self):
         self.assertEqual(_window_evidence(1, [(296, 388)]), "login_window")
         self.assertEqual(_window_evidence(5, [(1339, 942)]), "main_window")
+        self.assertEqual(_window_evidence(1, [(330, 257), (296, 388)]), "login_window")
         self.assertEqual(_window_evidence(1, []), "unknown")
-        self.assertEqual(_window_evidence(5, [(296, 388)]), "unknown")
+        self.assertEqual(_window_evidence(5, [(296, 388)]), "login_window")
+
+    def test_ambiguous_window_is_offline(self):
+        with patch("wxbridge.identity.wechat_process_state", return_value="present"):
+            with patch("wxbridge.identity.wechat_window_state", return_value="unknown"):
+                with patch("wxbridge.identity.unseal_keys", return_value=("wxid_demo_abcd", "hash", {})):
+                    result = local_identity()
+        self.assertEqual(result["state"], "offline")
+        self.assertTrue(result["accountId"])
 
 
 if __name__ == "__main__":

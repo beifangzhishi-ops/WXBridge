@@ -28,12 +28,15 @@ plaintext databases or private chat data across machines.
 ## Endpoints
 
 - Authenticated `GET /status`: compatibility status; no claim about login.
-- Authenticated `GET /identity`: `state=offline|candidate|unknown`,
+- Authenticated `GET /identity`: `state=online|offline` only,
   `accountId`, `process`, `windowState` and `loginVerified:false`. Uses
   read-only WeChat window geometry to distinguish visible large main windows
   from compact QR login dialogs in addition to the local account vault.
-  Hidden/ambiguous windows fail closed. This remains a heuristic, **not proof**
-  of the server-side login state.
+  Missing/ambiguous main windows report `offline`, never a third status.
+  Unreachable APIs remain separate communication errors, not login statuses.
+  A single confirmed `online` account can route when the peer is unreachable;
+  two reachable nodes both reporting that account `online` cause a conflict.
+  This remains a local heuristic, **not proof** of server-side login state.
 - Authenticated `POST /query`: JSON `{"args":["sessions","--limit","20"]}`;
   only allowlisted, bounded read commands are accepted and locally executed.
 

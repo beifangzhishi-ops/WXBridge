@@ -132,9 +132,10 @@ def query_identity(node: str) -> dict:
     try:
         result = json.loads(raw.decode("utf-8"))
         if (result.get("protocol") != API_VERSION
-                or result.get("state") not in ("offline", "candidate", "unknown")
+                or result.get("state") not in ("online", "offline")
                 or result.get("loginVerified") is not False
-                or not isinstance(result.get("accountId"), (str, type(None)))):
+                or not isinstance(result.get("accountId"), (str, type(None)))
+                or (result.get("state") == "online" and not result.get("accountId"))):
             raise ValueError("bad identity")
         return result
     except (ValueError, TypeError, UnicodeError):

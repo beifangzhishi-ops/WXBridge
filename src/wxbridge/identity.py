@@ -1,7 +1,8 @@
-"""Read-only, fail-closed local WeChat account discovery for API routing.
+"""Read-only WeChat account discovery with strictly binary login state.
 
-Process presence is *not* proof of an authenticated WeChat login. The
-reported state is deliberately called `candidate`, never `online`.
+Only a visible main window plus a matching cached account is positive
+evidence. A process, old key vault, login dialog, or ambiguous UI alone is
+not enough and is reported as offline, not as a third login state.
 """
 
 from __future__ import annotations
@@ -66,9 +67,11 @@ def _window_evidence(process_count: int, sizes: list[tuple[int, int]]) -> str:
     """
     if any(width >= 650 and height >= 480 for width, height in sizes):
         return "main_window"
-    if (process_count == 1 and len(sizes) == 1
-            and 200 <= sizes[0][0] <= 480
-            and 250 <= sizes[0][1] <= 550):
+    # Logging out of WeChat 4.x can leave both a small login dialog and
+    # its previous (disabled) login window visible simultaneously.
+    if (sizes and len(sizes) <= 3 and
+            all(200 <= width <= 480 and 200 <= height <= 550
+                for width, height in sizes)):
         return "login_window"
     return "unknown"
 
@@ -126,9 +129,9 @@ def local_identity() -> dict:
         account = re.sub(r"_\w{4}$", "", storage)
     except (KeyVaultError, OSError, ValueError):
         pass
-    # Do not claim login from a process name and a potentially stale vault.
-    state = ("offline" if process == "absent" or window == "login_window" else
-             "candidate" if process == "present" and window == "main_window" and account
-             else "unknown")
+    # A cached account/Weixin.exe alone can survive logout. Do not treat
+    # absence of positive visible-main-window evidence as online.
+    state = ("online" if process == "present" and window == "main_window" and account
+             else "offline")
     return {"state": state, "accountId": account,
             "process": process, "windowState": window, "loginVerified": False}

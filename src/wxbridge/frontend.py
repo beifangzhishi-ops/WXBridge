@@ -115,15 +115,12 @@ def select_node(requested: str | None) -> tuple[str, str]:
             results[node] = query_identity(node)
         except RemoteError as exc:
             failures[node] = str(exc)
-    # An unresponsive node may also host the same account. Don't silently
-    # choose the other one when uniqueness cannot be established.
-    if failures:
-        raise FrontendError("environment_status_unavailable:" + ",".join(sorted(failures)))
+    # Login state has exactly two values. If an API is unreachable, that
+    # machine has no *confirmed* online login; continue only when a unique
+    # positively identified node is available. Keep API faults distinct from
+    # a confirmed local logout in diagnostics.
     candidates = [(node, data["accountId"]) for node, data in results.items()
-                  if data["state"] == "candidate" and data.get("accountId")]
-    unknown = [node for node, data in results.items() if data["state"] == "unknown"]
-    if unknown:
-        raise FrontendError("wechat_status_unknown:" + ",".join(unknown))
+                  if data["state"] == "online" and data.get("accountId")]
     if account_id:
         candidates = [(node, ident) for node, ident in candidates if ident == account_id]
     elif len({ident for _, ident in candidates}) > 1:
@@ -131,6 +128,8 @@ def select_node(requested: str | None) -> tuple[str, str]:
     if len(candidates) > 1:
         raise FrontendError("account_present_on_multiple_environments")
     if not candidates:
+        if failures:
+            raise FrontendError("environment_status_unavailable:" + ",".join(sorted(failures)))
         raise FrontendError("account_not_found_on_running_wechat")
     return candidates[0]
 
