@@ -1,4 +1,9 @@
 """PyInstaller entrypoint. WXBridge command exposure is read-only."""
+
+from wxbridge.stdio import restore_inherited_output
+
+restore_inherited_output()
+
 from wxbridge.frontend import main
 
 if __name__ == "__main__":

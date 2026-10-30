@@ -6,7 +6,7 @@ $python = Join-Path $root '.vendor\replica-db39\Scripts\python.exe'
 if (-not (Test-Path $python)) { throw 'missing_exe_build_python_environment' }
 
 $arguments = @(
-    '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--console',
+    '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--windowed',
     '--name', 'WXBridge',
     '--contents-directory', '_wxbridge_runtime',
     '--paths', (Join-Path $root 'src'),

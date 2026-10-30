@@ -5,8 +5,9 @@ messages or automate the WeChat UI. Private development project.
 
 ## Architecture
 
-- **6v:** one public `WXBridge.exe` (with adjacent `_wxbridge_runtime/`) and a
-  Python HTTP API.
+- **6v:** one no-console public `WXBridge.exe` (with adjacent
+  `_wxbridge_runtime/`) and a Python HTTP API. Native stdout/stderr
+  are retained for CCM, Codex and shell captures without opening a CMD window.
 - **noha:** the same Python HTTP API and local Reader; **no EXE required**.
 - The EXE chooses the requested/default WeChat account, checks both API
   identities, then sends the read request to the chosen API — even when the
@@ -64,10 +65,11 @@ the EXE can use the other machine if it is positively identified. If neither
 machine can be identified as online, it fails with a clear error.
 
 **Login limitation:** the API's authenticated `/identity` endpoint checks for
-the WeChat process, visible main-vs-login-window geometry and the account
-attached to the local protected key vault. This uses read-only Windows window
-metadata, never clicks or reads process memory. Hidden or ambiguous windows
-count as offline. Login state has **only `online` and `offline`**, but the
+the WeChat process, main-window geometry (including tray-hidden windows),
+absence of a visible login dialog, and the account attached to the local
+protected key vault. This uses read-only Windows window metadata, never
+clicks or reads process memory. An ambiguous or login-only window state
+counts as offline. Login state has **only `online` and `offline`**, but the
 positive signal is still a local window heuristic, **not proof of server-side login**;
 responses explicitly carry `loginVerified:false`. No WeChat process memory,
 UI automation, key extraction, or state change is used. Successful message

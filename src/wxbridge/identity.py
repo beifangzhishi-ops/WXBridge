@@ -1,8 +1,9 @@
 """Read-only WeChat account discovery with strictly binary login state.
 
-Only a visible main window plus a matching cached account is positive
-evidence. A process, old key vault, login dialog, or ambiguous UI alone is
-not enough and is reported as offline, not as a third login state.
+The main window may be hidden in the system tray while WeChat is logged in.
+Inspecting a hidden large main window is useful positive local evidence
+provided no login dialog is present. A process or old key vault alone is
+not enough; ambiguous UI is always offline.
 """
 
 from __future__ import annotations
@@ -59,20 +60,27 @@ def wechat_process_state() -> str:
     return "unknown" if pids is None else "present" if pids else "absent"
 
 
-def _window_evidence(process_count: int, sizes: list[tuple[int, int]]) -> str:
-    """Conservative WeChat 4.x window-size heuristic; never proof of login.
+def _window_evidence(process_count: int, sizes: list[tuple[int, int]],
+                     hidden_sizes: list[tuple[int, int]] | None = None) -> str:
+    """Read-only geometry heuristic, including tray-hidden main windows.
 
-    A visible large main window is distinguishable from a single compact QR
-    login dialog. Anything else is unknown, including tray-only operation.
+    A visible login dialog takes precedence over a hidden main window; logout
+    may retain a previously hidden window whose content is no longer valid.
     """
-    if any(width >= 650 and height >= 480 for width, height in sizes):
+    hidden_sizes = hidden_sizes or []
+    def is_main(size):
+        return size[0] >= 650 and size[1] >= 480
+
+    def is_login(size):
+        return 200 <= size[0] <= 480 and 200 <= size[1] <= 550
+
+    if any(is_main(size) for size in sizes):
         return "main_window"
-    # Logging out of WeChat 4.x can leave both a small login dialog and
-    # its previous (disabled) login window visible simultaneously.
-    if (sizes and len(sizes) <= 3 and
-            all(200 <= width <= 480 and 200 <= height <= 550
-                for width, height in sizes)):
+    # WeChat 4.x may show two overlapping small login dialogs on logout.
+    if sizes and len(sizes) <= 3 and all(is_login(size) for size in sizes):
         return "login_window"
+    if any(is_main(size) for size in hidden_sizes) and not sizes:
+        return "main_window"
     return "unknown"
 
 
@@ -89,6 +97,14 @@ def wechat_window_state() -> str:
         _fields_ = [("left", wintypes.LONG), ("top", wintypes.LONG),
                     ("right", wintypes.LONG), ("bottom", wintypes.LONG)]
 
+    class Point(ctypes.Structure):
+        _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+
+    class WindowPlacement(ctypes.Structure):
+        _fields_ = [("length", wintypes.UINT), ("flags", wintypes.UINT),
+                    ("showCmd", wintypes.UINT), ("minPosition", Point),
+                    ("maxPosition", Point), ("normalPosition", Rect)]
+
     cb_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
     user32.EnumWindows.argtypes = (cb_type, wintypes.LPARAM)
     user32.EnumWindows.restype = wintypes.BOOL
@@ -96,13 +112,17 @@ def wechat_window_state() -> str:
     user32.IsWindowVisible.argtypes = (wintypes.HWND,)
     user32.GetClassNameW.argtypes = (wintypes.HWND, wintypes.LPWSTR, ctypes.c_int)
     user32.GetWindowRect.argtypes = (wintypes.HWND, ctypes.POINTER(Rect))
+    user32.IsIconic.argtypes = (wintypes.HWND,)
+    user32.GetWindowPlacement.argtypes = (wintypes.HWND,
+                                         ctypes.POINTER(WindowPlacement))
     sizes: list[tuple[int, int]] = []
+    hidden_sizes: list[tuple[int, int]] = []
 
     @cb_type
     def on_window(hwnd, _param):
         owner = wintypes.DWORD()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
-        if owner.value not in pids or not user32.IsWindowVisible(hwnd):
+        if owner.value not in pids:
             return True
         name = ctypes.create_unicode_buffer(256)
         user32.GetClassNameW(hwnd, name, len(name))
@@ -110,13 +130,23 @@ def wechat_window_state() -> str:
         if name.value != "WeChatMainWndForPC" and not name.value.endswith("QWindowIcon"):
             return True
         bounds = Rect()
-        if user32.GetWindowRect(hwnd, ctypes.byref(bounds)):
-            sizes.append((bounds.right - bounds.left, bounds.bottom - bounds.top))
+        if user32.IsIconic(hwnd):
+            placement = WindowPlacement()
+            placement.length = ctypes.sizeof(WindowPlacement)
+            if user32.GetWindowPlacement(hwnd, ctypes.byref(placement)):
+                bounds = placement.normalPosition
+            else:
+                return True
+        elif not user32.GetWindowRect(hwnd, ctypes.byref(bounds)):
+            return True
+        if bounds.right > bounds.left and bounds.bottom > bounds.top:
+            size = (bounds.right - bounds.left, bounds.bottom - bounds.top)
+            (sizes if user32.IsWindowVisible(hwnd) else hidden_sizes).append(size)
         return True
 
     if not user32.EnumWindows(on_window, 0):
         return "unknown"
-    return _window_evidence(len(pids), sizes)
+    return _window_evidence(len(pids), sizes, hidden_sizes)
 
 
 def local_identity() -> dict:
@@ -129,8 +159,9 @@ def local_identity() -> dict:
         account = re.sub(r"_\w{4}$", "", storage)
     except (KeyVaultError, OSError, ValueError):
         pass
-    # A cached account/Weixin.exe alone can survive logout. Do not treat
-    # absence of positive visible-main-window evidence as online.
+    # A cached account/Weixin.exe alone can survive logout. An observed
+    # large main window (visible or tray-hidden), without a login dialog,
+    # is positive heuristic evidence but never a server-side verification.
     state = ("online" if process == "present" and window == "main_window" and account
              else "offline")
     return {"state": state, "accountId": account,

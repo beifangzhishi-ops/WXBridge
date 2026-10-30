@@ -30,8 +30,9 @@ plaintext databases or private chat data across machines.
 - Authenticated `GET /status`: compatibility status; no claim about login.
 - Authenticated `GET /identity`: `state=online|offline` only,
   `accountId`, `process`, `windowState` and `loginVerified:false`. Uses
-  read-only WeChat window geometry to distinguish visible large main windows
-  from compact QR login dialogs in addition to the local account vault.
+  read-only WeChat window geometry for both visible and tray-hidden large
+  main windows, with visible small login dialogs taking precedence over
+  hidden main windows, in addition to the local protected account vault.
   Missing/ambiguous main windows report `offline`, never a third status.
   Unreachable APIs remain separate communication errors, not login statuses.
   A single confirmed `online` account can route when the peer is unreachable;

@@ -140,6 +140,10 @@ class FrontendTests(unittest.TestCase):
         self.assertEqual(_window_evidence(1, [(330, 257), (296, 388)]), "login_window")
         self.assertEqual(_window_evidence(1, []), "unknown")
         self.assertEqual(_window_evidence(5, [(296, 388)]), "login_window")
+        self.assertEqual(_window_evidence(5, [], [(1150, 860)]), "main_window")
+        self.assertEqual(_window_evidence(5, [(296, 388)], [(1150, 860)]), "login_window")
+        self.assertEqual(_window_evidence(5, [], [(296, 388)]), "unknown")
+        self.assertEqual(_window_evidence(5, [(420, 600)], [(1150, 860)]), "unknown")
 
     def test_ambiguous_window_is_offline(self):
         with patch("wxbridge.identity.wechat_process_state", return_value="present"):
