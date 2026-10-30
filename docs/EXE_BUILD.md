@@ -15,6 +15,23 @@ stdout/stderr handles if the caller supplied pipes, preserving JSON and exit
 codes for CCM, Codex, PowerShell and `subprocess.run(capture_output=True)`.
 Launching without an output consumer does not open a terminal or dialog.
 
+**PowerShell usage:** Windows PowerShell/PowerShell 7 may return immediately
+from a GUI-subsystem EXE launched as a bare native command, leaving
+`$LASTEXITCODE` unset and discarding the eventual stdout. Invoke it in a
+pipeline to force PowerShell to wait and consume the result:
+
+```powershell
+$json = & "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" chats --limit 2 | Out-String
+$exitCode = $LASTEXITCODE
+$data = $json | ConvertFrom-Json
+```
+
+This is the supported CCM/Codex PowerShell pattern. The EXE remains the
+only public command; no auxiliary console or wrapper executable is needed.
+The exit code and stderr remain observable through the pipeline. Direct
+`subprocess.run([exe, ...], capture_output=True)` also waits and captures
+JSON correctly.
+
 The EXE embeds the routing frontend only. Neither the WeChat Reader nor
 decryption credentials are bundled in the public executable. On each API
 host, the local Reader uses the pinned source and protected cached keys.
@@ -37,8 +54,8 @@ bundle changes.
 ## Smoke tests
 
 ```powershell
-& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" --help
-& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" chats --limit 2
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" --help | Out-String
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" chats --limit 2 | Out-String
 ```
 
 The first invocation prints help and exits successfully without querying

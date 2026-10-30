@@ -8,6 +8,8 @@ messages or automate the WeChat UI. Private development project.
 - **6v:** one no-console public `WXBridge.exe` (with adjacent
   `_wxbridge_runtime/`) and a Python HTTP API. Native stdout/stderr
   are retained for CCM, Codex and shell captures without opening a CMD window.
+  PowerShell callers must use a pipeline, such as `| Out-String`, so the
+  shell waits for the GUI-subsystem executable and captures its JSON.
 - **noha:** the same Python HTTP API and local Reader; **no EXE required**.
 - The EXE chooses the requested/default WeChat account, checks both API
   identities, then sends the read request to the chosen API — even when the
@@ -25,15 +27,15 @@ messages or automate the WeChat UI. Private development project.
 ## Public EXE
 
 ```powershell
-& "C:\path\to\WXBridge\WXBridge.exe"                         # Help only
-& "C:\path\to\WXBridge\WXBridge.exe" chats                   # 20 recent conversations
-& "C:\path\to\WXBridge\WXBridge.exe" chats --keyword "狂人"
-& "C:\path\to\WXBridge\WXBridge.exe" messages --chat "狂人"   # 30 recent messages
-& "C:\path\to\WXBridge\WXBridge.exe" files --chat "狂人"      # 20 recent attachments
-& "C:\path\to\WXBridge\WXBridge.exe" files --chat "狂人" --id "message__message_3.db:602"
-& "C:\path\to\WXBridge\WXBridge.exe" moments                 # 20 recent posts
-& "C:\path\to\WXBridge\WXBridge.exe" moments --interactions
-& "C:\path\to\WXBridge\WXBridge.exe" --account "work" chats
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" | Out-String
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" chats | Out-String
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" chats --keyword "狂人" | Out-String
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" messages --chat "狂人" | Out-String
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" files --chat "狂人" | Out-String
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" files --chat "狂人" --id "message__message_3.db:602" | Out-String
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" moments | Out-String
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" moments --interactions | Out-String
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\WXBridge.exe" --account "work" chats | Out-String
 ```
 
 Commands: `chats`, `messages`, `files`, `moments`. Use `--help` on each for
