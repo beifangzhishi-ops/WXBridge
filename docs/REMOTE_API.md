@@ -58,6 +58,40 @@ CCM can read it there without sending file bytes over the WXBridge API.
 Version-sync both source checkouts, rebuild 6v EXE, and restart **both**
 APIs after code updates. Git synchronization alone does not restart an API.
 Both nodes need local Python dependencies and their own authorized DPAPI vault.
-No persistent Windows service/scheduled-task installation is bundled.
-Windows API startup now requests exclusive port ownership, so an old service
-must be stopped before a replacement can bind to the same IP and port.
+### Headless self-healing API
+
+The internal `wxbridge.supervisor` process keeps one API child alive per
+machine. Every five seconds it checks authenticated local `GET /status`
+against its Tailscale address without a proxy. A dead process or sustained
+health-check failure is restarted after a startup grace period. The
+supervisor never terminates a server process it did not start.
+
+Run the one-time per-machine task installer with Windows task registration
+permissions:
+
+```powershell
+# On 6v
+& "C:\Users\Songjx\Documents\ChatGPT\WXBridge\tools\install_api_task.ps1" -Node 6v -Bind 100.76.74.124
+# On noha
+& "C:\Users\noha\Documents\AAAVitalFile\WXBridge\tools\install_api_task.ps1" -Node noha -Bind 100.96.30.32
+```
+
+This updates only the current user's `WXBridge-API` scheduled task. It
+launches `pythonw.exe` with `tools/api_supervisor.py` at interactive logon,
+and starts it immediately. The task has no execution-time limit or battery
+restrictions; Task Scheduler can retry a failed supervisor (ten attempts,
+one minute apart). The supervisor itself retries unhealthy API children
+indefinitely. No user-facing EXE is installed on noha.
+
+Only local `.state/api-token.txt` is read; no credentials are passed on
+the command line or written to the log. Bounded rotating diagnostics go to
+ignored `.state/api-supervisor.log`, and a process lock is held at
+`.state/api-supervisor.lock`.
+
+Windows API startup requests exclusive port ownership. Switching task
+actions requires stopping the old task first; if another process holds
+the port, the supervisor waits instead of killing that process.
+
+**Power boundary:** A supervisor cannot wake a sleeping computer. Screen
+blanking while the PC stays awake is supported; deep sleep/Modern Standby
+can suspend ordinary processes and network access.
