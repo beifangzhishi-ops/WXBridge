@@ -22,6 +22,9 @@ messages or automate the WeChat UI. Private development project.
   allowlist and per-machine DPAPI key caches remain separate.
 - HTTP request deadlines return `remote_timeout`; network or connection
   failures return `remote_unreachable`. Neither result means zero transactions.
+- Data queries allow 105 seconds for the HTTP client so the API's 90-second
+  one-shot Reader can finish or report `local_reader_timeout` itself. Slow
+  reads remain failed/unverified until a complete, valid response arrives.
 - Both API hosts have a headless supervisor monitoring the authenticated local
   HTTP endpoint and relaunching an unhealthy API process through the
   user-scoped `WXBridge-API` Windows task. It does not wake a sleeping PC.

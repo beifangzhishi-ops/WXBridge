@@ -7,9 +7,10 @@ import unittest
 from urllib import error as urlerror
 from unittest.mock import patch
 
-from wxbridge.api import API_VERSION, ExclusiveHTTPServer, make_handler, valid_query_args
+from wxbridge.api import (API_VERSION, READER_TIMEOUT_SECONDS,
+                          ExclusiveHTTPServer, make_handler, run_query, valid_query_args)
 from wxbridge.frontend import main
-from wxbridge.remote import RemoteError, query_identity, query_remote
+from wxbridge.remote import (QUERY_TIMEOUT_SECONDS, RemoteError, query_identity, query_remote)
 
 
 class TestRemoteApi(unittest.TestCase):
@@ -73,7 +74,8 @@ class TestRemoteApi(unittest.TestCase):
             )
         self.assertEqual(code, 0)
         self.assertEqual(result["sessions"][0]["id"], "invented")
-        self.assertEqual(opener.timeout, 30)
+        self.assertEqual(opener.timeout, QUERY_TIMEOUT_SECONDS)
+        self.assertGreater(QUERY_TIMEOUT_SECONDS, READER_TIMEOUT_SECONDS)
         self.assertEqual(json.loads(opener.request.data)["args"],
                          ["sessions", "--limit", "1"])
         self.assertTrue(mock.called)
@@ -113,6 +115,18 @@ class TestRemoteApi(unittest.TestCase):
                                     if operation == "query" else query_identity("6v"))
                             with self.assertRaisesRegex(RemoteError, "^" + expected + "$"):
                                 call()
+
+    def test_local_reader_deadline_is_not_a_connection_failure(self):
+        import subprocess
+        with patch("wxbridge.api.subprocess.run",
+                   side_effect=subprocess.TimeoutExpired("fictional-worker", 90)):
+            code, result = run_query(["messages", "--chat", "fictional", "--limit", "5"])
+        self.assertEqual((code, result), (4, {"error": "local_reader_timeout"}))
+
+    def test_local_reader_start_failure_is_separate(self):
+        with patch("wxbridge.api.subprocess.run", side_effect=OSError("synthetic")):
+            code, result = run_query(["sessions"])
+        self.assertEqual((code, result), (4, {"error": "local_reader_unavailable"}))
 
     def test_new_public_cli_never_opens_local_db(self):
         with patch("wxbridge.frontend.query_identity", side_effect=RemoteError("remote_unreachable")):

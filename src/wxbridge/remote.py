@@ -16,6 +16,9 @@ class RemoteError(ValueError):
 
 
 API_VERSION = 1
+# A local Reader may legitimately need up to 90 seconds to decrypt and query
+# its scratch databases. The HTTP client must outlive that server-side limit.
+QUERY_TIMEOUT_SECONDS = 105
 
 
 def _transport_error(exc: OSError) -> RemoteError:
@@ -81,7 +84,9 @@ def query_remote(argv: list[str], *, node: str = "noha",
     )
     try:
         # Bypass unrelated HTTP_PROXY settings for the private Tailscale IP.
-        with request.build_opener(request.ProxyHandler({})).open(req, timeout=30) as response:
+        with request.build_opener(request.ProxyHandler({})).open(
+            req, timeout=QUERY_TIMEOUT_SECONDS
+        ) as response:
             raw = response.read(4 * 1024 * 1024 + 1)
     except error.HTTPError as exc:
         raise RemoteError("remote_http_" + str(exc.code)) from None

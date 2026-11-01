@@ -28,6 +28,7 @@ ALLOWED_COMMANDS = frozenset((
     "moments", "moment", "moment-interactions", "articles", "file-list",
 ))
 MAX_BODY = 8 * 1024
+READER_TIMEOUT_SECONDS = 90
 
 
 def valid_query_args(value: object) -> bool:
@@ -45,9 +46,11 @@ def run_query(argv: list[str]) -> tuple[int, object]:
         completed = subprocess.run(
             [sys.executable, "-m", "wxbridge.local_ops", *argv],
             cwd=str(app_root()), env=env, capture_output=True, text=True,
-            encoding="utf-8", errors="replace", timeout=90,
+            encoding="utf-8", errors="replace", timeout=READER_TIMEOUT_SECONDS,
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except subprocess.TimeoutExpired:
+        return 4, {"error": "local_reader_timeout"}
+    except OSError:
         return 4, {"error": "local_reader_unavailable"}
     try:
         if completed.returncode == 0:

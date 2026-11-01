@@ -18,5 +18,6 @@
 - The legacy `WXBridgeUI.cmd` is a hard-deny compatibility stub returning `wxbridge_ui_disabled`, and `wxbridge.operator` has been removed. Do not execute the original upstream `python -m wechatauto` UI/send commands as a substitute. CCM's filesystem sandbox does **not** automatically detect WeChat application mutations.
 - Ask before introducing historical compatibility; proactively clean up invalid, obsolete project names and instructions.
 - Transport errors distinguish `remote_timeout` (deadline exceeded) from `remote_unreachable` (network failure). Both are failed reads. Reconciliation must check actual EXE exit code, parseable nonempty JSON, and time coverage before claiming a result; use small paginated reads.
+- The HTTP client data-query timeout (105 s) must exceed the API's local Reader subprocess deadline (90 s), so a Reader timeout returns `local_reader_timeout` rather than being prematurely reported as a network error. Keep this invariant covered by tests.
 - If a Git remote is configured, test and commit completed work and push the configured branch. Never invent a remote.
 - Prepare source, docs, tests, security defaults, and packaging for eventual public release; do not create or push a public repository or release before the owner explicitly approves publication after actual message-reading verification.
