@@ -23,6 +23,7 @@ import types
 
 from .snapshot import PIN, SnapshotError, _upstream_dir
 from .runtime import frozen, embedded_source_is_verified
+from .process import NO_CONSOLE_FLAGS
 
 
 def _source(name: str) -> Path:
@@ -38,12 +39,15 @@ def _source(name: str) -> Path:
         return source
     try:
         head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
-                              capture_output=True, text=True, timeout=5)
+                              capture_output=True, text=True, timeout=5,
+                              creationflags=NO_CONSOLE_FLAGS)
         expected = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD:wechatauto/" + name],
-            capture_output=True, text=True, timeout=5)
+            capture_output=True, text=True, timeout=5,
+            creationflags=NO_CONSOLE_FLAGS)
         actual = subprocess.run(["git", "hash-object", str(source)],
-                                capture_output=True, text=True, timeout=5)
+                                capture_output=True, text=True, timeout=5,
+                                creationflags=NO_CONSOLE_FLAGS)
     except (FileNotFoundError, subprocess.TimeoutExpired):
         raise SnapshotError("extra_upstream_verification_failed") from None
     if (head.returncode or expected.returncode or actual.returncode

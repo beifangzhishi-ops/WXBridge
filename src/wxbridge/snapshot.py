@@ -19,6 +19,7 @@ import types
 from types import MethodType
 
 from .replica import ReplicaReader
+from .process import NO_CONSOLE_FLAGS
 from .runtime import embedded_root, embedded_source_is_verified, frozen, app_root
 from .message_shards import is_message_shard_name
 
@@ -60,6 +61,7 @@ def _load_upstream():
             proc = subprocess.run(
                 [*git, "rev-parse", "HEAD"],
                 capture_output=True, text=True, check=False, timeout=5,
+                creationflags=NO_CONSOLE_FLAGS,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired):
             raise SnapshotError("upstream_git_not_available") from None
@@ -71,10 +73,12 @@ def _load_upstream():
             expected = subprocess.run(
                 [*git, "rev-parse", "HEAD:wechatauto/db.py"],
                 capture_output=True, text=True, check=False, timeout=5,
+                creationflags=NO_CONSOLE_FLAGS,
             )
             actual = subprocess.run(
                 ["git", "hash-object", str(src)],
                 capture_output=True, text=True, timeout=5,
+                creationflags=NO_CONSOLE_FLAGS,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired):
             raise SnapshotError("upstream_verification_failed") from None

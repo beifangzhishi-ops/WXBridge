@@ -19,6 +19,7 @@ import sys
 from .remote import API_VERSION
 from .runtime import app_root
 from .identity import local_identity
+from .process import NO_CONSOLE_FLAGS
 
 
 ALLOWED_COMMANDS = frozenset((
@@ -47,6 +48,7 @@ def run_query(argv: list[str]) -> tuple[int, object]:
             [sys.executable, "-m", "wxbridge.local_ops", *argv],
             cwd=str(app_root()), env=env, capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=READER_TIMEOUT_SECONDS,
+            creationflags=NO_CONSOLE_FLAGS,
         )
     except subprocess.TimeoutExpired:
         return 4, {"error": "local_reader_timeout"}

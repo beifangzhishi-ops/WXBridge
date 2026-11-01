@@ -18,6 +18,9 @@ messages or automate the WeChat UI. Private development project.
   which calls the cached-key Reader on *that machine only*. The old WXBridge
   19-command user CLI has been removed; the original pinned upstream CLI is
   unchanged in `.vendor/replica-src/`.
+- The API's Reader subprocess and the Reader's pinned-source Git checks all
+  use Windows `CREATE_NO_WINDOW`, so a query does not pop up transient CMD
+  windows even though its subprocess output and exit status remain captured.
 - The existing API endpoint authentication, Tailscale-only binding, query
   allowlist and per-machine DPAPI key caches remain separate.
 - HTTP request deadlines return `remote_timeout`; network or connection
