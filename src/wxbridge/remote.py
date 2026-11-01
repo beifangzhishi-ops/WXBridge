@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import ipaddress
+import socket
 from urllib import error, request
 from urllib.parse import urlsplit
 
@@ -15,6 +16,14 @@ class RemoteError(ValueError):
 
 
 API_VERSION = 1
+
+
+def _transport_error(exc: OSError) -> RemoteError:
+    """Separate deadline expiry from connection failures without leaking details."""
+    cause = exc.reason if isinstance(exc, error.URLError) else exc
+    if isinstance(cause, (TimeoutError, socket.timeout)):
+        return RemoteError("remote_timeout")
+    return RemoteError("remote_unreachable")
 
 
 def _private_config(node: str) -> tuple[str, str]:
@@ -76,8 +85,8 @@ def query_remote(argv: list[str], *, node: str = "noha",
             raw = response.read(4 * 1024 * 1024 + 1)
     except error.HTTPError as exc:
         raise RemoteError("remote_http_" + str(exc.code)) from None
-    except (error.URLError, TimeoutError, OSError):
-        raise RemoteError("remote_unreachable") from None
+    except (error.URLError, TimeoutError, OSError) as exc:
+        raise _transport_error(exc) from None
     if len(raw) > 4 * 1024 * 1024:
         raise RemoteError("remote_response_too_large")
     try:
@@ -125,8 +134,8 @@ def query_identity(node: str) -> dict:
             raw = response.read(4097)
     except error.HTTPError as exc:
         raise RemoteError("remote_http_" + str(exc.code)) from None
-    except (error.URLError, TimeoutError, OSError):
-        raise RemoteError("remote_unreachable") from None
+    except (error.URLError, TimeoutError, OSError) as exc:
+        raise _transport_error(exc) from None
     if len(raw) > 4096:
         raise RemoteError("remote_invalid_response")
     try:

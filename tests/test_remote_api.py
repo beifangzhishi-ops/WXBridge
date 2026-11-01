@@ -4,11 +4,12 @@ import io
 import socket
 import json
 import unittest
+from urllib import error as urlerror
 from unittest.mock import patch
 
 from wxbridge.api import API_VERSION, ExclusiveHTTPServer, make_handler, valid_query_args
 from wxbridge.frontend import main
-from wxbridge.remote import RemoteError, query_remote
+from wxbridge.remote import RemoteError, query_identity, query_remote
 
 
 class TestRemoteApi(unittest.TestCase):
@@ -93,6 +94,25 @@ class TestRemoteApi(unittest.TestCase):
                 ["self"], node="6v",
                 url="http://100.76.74.124:18763", token="synthetic-test-token")
         self.assertEqual((code, result["node"]), (0, "6v"))
+
+    def test_timeout_is_distinct_from_connection_failure_for_both_endpoints(self):
+        cases = (
+            (TimeoutError("timed out"), "remote_timeout"),
+            (urlerror.URLError(socket.timeout("timed out")), "remote_timeout"),
+            (urlerror.URLError(ConnectionRefusedError("refused")), "remote_unreachable"),
+            (ConnectionResetError("reset"), "remote_unreachable"),
+        )
+        with patch("wxbridge.remote._private_config",
+                   return_value=("http://100.76.74.124:18763", "synthetic-test-token")):
+            with patch("wxbridge.remote.request.build_opener") as opener:
+                for exc, expected in cases:
+                    for operation in ("query", "identity"):
+                        with self.subTest(error=type(exc).__name__, operation=operation):
+                            opener.return_value.open.side_effect = exc
+                            call = (lambda: query_remote(["sessions"], node="6v")
+                                    if operation == "query" else query_identity("6v"))
+                            with self.assertRaisesRegex(RemoteError, "^" + expected + "$"):
+                                call()
 
     def test_new_public_cli_never_opens_local_db(self):
         with patch("wxbridge.frontend.query_identity", side_effect=RemoteError("remote_unreachable")):

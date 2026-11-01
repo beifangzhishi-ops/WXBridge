@@ -20,6 +20,8 @@ messages or automate the WeChat UI. Private development project.
   unchanged in `.vendor/replica-src/`.
 - The existing API endpoint authentication, Tailscale-only binding, query
   allowlist and per-machine DPAPI key caches remain separate.
+- HTTP request deadlines return `remote_timeout`; network or connection
+  failures return `remote_unreachable`. Neither result means zero transactions.
 - Both API hosts have a headless supervisor monitoring the authenticated local
   HTTP endpoint and relaunching an unhealthy API process through the
   user-scoped `WXBridge-API` Windows task. It does not wake a sleeping PC.
